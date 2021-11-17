@@ -126,12 +126,12 @@ namespace ParallelCmd
                 if (commandEnd == -1)
                     throw new ArgumentException("Command parameters starting with a quote must end with a quote");
 
-                arguments = command[(commandEnd + 2)..];
+                arguments = commandEnd < command.Length - 1 ? command[(commandEnd + 2)..] : null;
                 command = command[1..commandEnd];
             }
             else if ((commandEnd = command.IndexOf(' ')) >= 0)
             {
-                arguments = command[(commandEnd + 1)..];
+                arguments = commandEnd < command.Length - 1 ? command[(commandEnd + 1)..] : null;
                 command = command[..commandEnd];
             }
 
