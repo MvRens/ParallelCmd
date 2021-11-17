@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using ParallelCmd.Output;
@@ -19,7 +20,9 @@ namespace ParallelCmd
             this.commandOutput = commandOutput;
             this.command = command;
             this.arguments = arguments;
-            this.workingDirectory = workingDirectory;
+
+            // A '\.' is allowed at the end to prevent issues without batch quotes and a \ at the end, so we need to resolve the path
+            this.workingDirectory = workingDirectory != null ? Path.GetFullPath(workingDirectory) : null;
         }
 
 
