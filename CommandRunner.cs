@@ -63,7 +63,7 @@ namespace ParallelCmd
                     if (!process.HasExited)
                     {
                         // Despite many examples (like https://stackoverflow.com/questions/813086/can-i-send-a-ctrl-c-sigint-to-an-application-on-windows)
-                        // I could not get it working properly, so for now we'll just kill it ¯\_(ツ)_/¯
+                        // I could not get it working properly with multiple runners, so for now we'll just kill it ¯\_(ツ)_/¯
                         process.Kill();
                         commandOutput.WriteLine("Process killed");
                     }

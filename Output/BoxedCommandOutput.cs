@@ -20,6 +20,10 @@ namespace ParallelCmd.Output
             bottom = (top + boxHeight * commandCount) + 1;
 
             Console.CursorVisible = false;
+
+            // Make sure we scroll all the way
+            for (var i = 0; i < Console.WindowHeight - 1; i++)
+                Console.WriteLine();
         }
 
 
