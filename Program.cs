@@ -29,6 +29,12 @@ namespace ParallelCmd
             [Option('b', "boxsize", Default = null, HelpText = "The height of each command's output box when using the Boxed output. Defaults to an even distribution of the console's height.")]
             public int? BoxSize { get; set; }
 
+            [Option("boxheaderbg", Default = ConsoleColor.DarkBlue, HelpText = "The background color of the headers when using the Boxed output. One of the ConsoleColor values.")]
+            public ConsoleColor BoxHeaderBackground { get; set; }
+
+            [Option("boxheaderfg", Default = ConsoleColor.Gray, HelpText = "The foreground color of the headers when using the Boxed output. One of the ConsoleColor values.")]
+            public ConsoleColor BoxHeaderForeground { get; set; }
+
             [Option('w', "workingdir", HelpText = "Specifies the default working directory to use for commands. If not specified, the current working directory will be used.")]
             public string? DefaultWorkingDirectory { get; set; }
 
@@ -71,7 +77,7 @@ namespace ParallelCmd
                 options.OutputFormat switch
                 {
                     OutputFormat.interlaced => new InterlacedCommandOutputFactory(),
-                    OutputFormat.boxed => new BoxedCommandOutputFactory(options.BoxSize, commandsArray.Length),
+                    OutputFormat.boxed => new BoxedCommandOutputFactory(options.BoxSize, commandsArray.Length, options.BoxHeaderBackground, options.BoxHeaderForeground),
                     _ => new InterlacedCommandOutputFactory()
                 };
 

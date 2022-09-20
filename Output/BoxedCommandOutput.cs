@@ -4,6 +4,8 @@ namespace ParallelCmd.Output
 {
     public class BoxedCommandOutputFactory : ICommandOutputFactory
     {
+        private readonly ConsoleColor headerBackground;
+        private readonly ConsoleColor headerForeground;
         private readonly int boxWidth;
         private readonly int boxHeight;
         private readonly int top;
@@ -12,8 +14,10 @@ namespace ParallelCmd.Output
         private readonly object outputLock = new();
 
 
-        public BoxedCommandOutputFactory(int? boxSize, int commandCount)
+        public BoxedCommandOutputFactory(int? boxSize, int commandCount, ConsoleColor headerBackground, ConsoleColor headerForeground)
         {
+            this.headerBackground = headerBackground;
+            this.headerForeground = headerForeground;
             boxWidth = Console.WindowWidth;
             boxHeight = Math.Max(boxSize ?? Console.WindowHeight / commandCount, 1);
             top = Console.CursorTop;
@@ -29,7 +33,7 @@ namespace ParallelCmd.Output
 
         public ICommandOutput Create(string command, string? arguments, int commandIndex)
         {
-            return new BoxedCommandOutput(outputLock, command, arguments, top + (commandIndex * boxHeight), boxWidth, boxHeight);
+            return new BoxedCommandOutput(outputLock, command, arguments, top + (commandIndex * boxHeight), boxWidth, boxHeight, headerBackground, headerForeground);
         }
 
 
@@ -50,10 +54,10 @@ namespace ParallelCmd.Output
 
             private readonly string[] lines; 
             private int nextLineIndex;
-            private bool linesWrapped = false;
+            private bool linesWrapped;
 
 
-            public BoxedCommandOutput(object lockObject, string command, string? arguments, int boxTop, int boxWidth, int boxHeight)
+            public BoxedCommandOutput(object lockObject, string command, string? arguments, int boxTop, int boxWidth, int boxHeight, ConsoleColor headerBackground, ConsoleColor headerForeground)
             {
                 this.lockObject = lockObject;
                 this.boxTop = boxTop;
@@ -68,8 +72,8 @@ namespace ParallelCmd.Output
                     var currentForeground = Console.ForegroundColor;
                     try
                     {
-                        Console.BackgroundColor = ConsoleColor.DarkBlue;
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        Console.BackgroundColor = headerBackground;
+                        Console.ForegroundColor = headerForeground;
 
                         WriteFullWidthLine(command + " " + arguments);
                     }
