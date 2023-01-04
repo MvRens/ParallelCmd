@@ -12,16 +12,16 @@ namespace ParallelCmd.Output
         private readonly ConsoleColor headerForeground;
         private int boxWidth;
         private int boxHeight;
-        private readonly int top;
+        private int top;
         private int bottom;
 
         private readonly object outputLock = new();
 
-        private Timer resizeTimer;
-        private List<BoxedCommandOutput> outputs = new();
+        private readonly Timer resizeTimer;
+        private readonly List<BoxedCommandOutput> outputs = new();
 
 
-        private const int ResizeCheckInterval = 1000;
+        private const int ResizeCheckInterval = 500;
 
 
         public BoxedCommandOutputFactory(int? boxSize, int commandCount, ConsoleColor headerBackground, ConsoleColor headerForeground)
@@ -32,11 +32,7 @@ namespace ParallelCmd.Output
             this.headerForeground = headerForeground;
 
             CalculateBoxSize(out boxWidth, out boxHeight);
-            top = Console.CursorTop;
-            bottom = (top + boxHeight * commandCount) + 1;
-
-            Console.Clear();
-            Console.CursorVisible = false;
+            ResetConsole();
 
             resizeTimer = new Timer(CheckResized, null, ResizeCheckInterval, ResizeCheckInterval);
         }
@@ -46,6 +42,16 @@ namespace ParallelCmd.Output
         {
             width = Console.WindowWidth;
             height = Math.Max(boxSize ?? Console.WindowHeight / commandCount, 1);
+        }
+
+
+        private void ResetConsole()
+        {
+            Console.Clear();
+            Console.CursorVisible = false;
+
+            top = Console.CursorTop;
+            bottom = (top + boxHeight * commandCount) + 1;
         }
 
 
@@ -60,8 +66,7 @@ namespace ParallelCmd.Output
                 boxWidth = newWidth;
                 boxHeight = newHeight;
 
-                Console.Clear();
-                Console.CursorVisible = false;
+                ResetConsole();
 
                 for (var outputIndex = 0; outputIndex < outputs.Count; outputIndex++)
                     outputs[outputIndex].Resize(top + outputIndex * boxHeight,  boxWidth, boxHeight);
