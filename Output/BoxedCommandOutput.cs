@@ -1,44 +1,87 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Threading;
 
 namespace ParallelCmd.Output
 {
     public class BoxedCommandOutputFactory : ICommandOutputFactory
     {
+        private readonly int? boxSize;
+        private readonly int commandCount;
         private readonly ConsoleColor headerBackground;
         private readonly ConsoleColor headerForeground;
-        private readonly int boxWidth;
-        private readonly int boxHeight;
+        private int boxWidth;
+        private int boxHeight;
         private readonly int top;
-        private readonly int bottom;
+        private int bottom;
 
         private readonly object outputLock = new();
+
+        private Timer resizeTimer;
+        private List<BoxedCommandOutput> outputs = new();
+
+
+        private const int ResizeCheckInterval = 1000;
 
 
         public BoxedCommandOutputFactory(int? boxSize, int commandCount, ConsoleColor headerBackground, ConsoleColor headerForeground)
         {
+            this.boxSize = boxSize;
+            this.commandCount = commandCount;
             this.headerBackground = headerBackground;
             this.headerForeground = headerForeground;
-            boxWidth = Console.WindowWidth;
-            boxHeight = Math.Max(boxSize ?? Console.WindowHeight / commandCount, 1);
+
+            CalculateBoxSize(out boxWidth, out boxHeight);
             top = Console.CursorTop;
             bottom = (top + boxHeight * commandCount) + 1;
 
+            Console.Clear();
             Console.CursorVisible = false;
 
-            // Make sure we scroll all the way
-            for (var i = 0; i < Console.WindowHeight - 1; i++)
-                Console.WriteLine();
+            resizeTimer = new Timer(CheckResized, null, ResizeCheckInterval, ResizeCheckInterval);
+        }
+
+
+        private void CalculateBoxSize(out int width, out int height)
+        {
+            width = Console.WindowWidth;
+            height = Math.Max(boxSize ?? Console.WindowHeight / commandCount, 1);
+        }
+
+
+        private void CheckResized(object? state)
+        {
+            CalculateBoxSize(out var newWidth, out var newHeight);
+            if (newWidth == boxWidth && newHeight == boxHeight)
+                return;
+
+            lock (outputLock)
+            {
+                boxWidth = newWidth;
+                boxHeight = newHeight;
+
+                Console.Clear();
+                Console.CursorVisible = false;
+
+                for (var outputIndex = 0; outputIndex < outputs.Count; outputIndex++)
+                    outputs[outputIndex].Resize(top + outputIndex * boxHeight,  boxWidth, boxHeight);
+            }
         }
 
 
         public ICommandOutput Create(string command, string? arguments, int commandIndex)
         {
-            return new BoxedCommandOutput(outputLock, command, arguments, top + (commandIndex * boxHeight), boxWidth, boxHeight, headerBackground, headerForeground);
+            var output = new BoxedCommandOutput(outputLock, command, arguments, top + (commandIndex * boxHeight), boxWidth, boxHeight, headerBackground, headerForeground);
+            outputs.Add(output);
+
+            return output;
         }
 
 
         public void Dispose()
         {
+            resizeTimer.Dispose();
+
             Console.CursorTop = bottom;
             Console.CursorVisible = true;
 
@@ -49,10 +92,14 @@ namespace ParallelCmd.Output
         protected class BoxedCommandOutput : ICommandOutput
         {
             private readonly object lockObject;
-            private readonly int boxTop;
-            private readonly int boxWidth;
+            private readonly string command;
+            private readonly string? arguments;
+            private readonly ConsoleColor headerBackground;
+            private readonly ConsoleColor headerForeground;
+            private int firstLineTop;
+            private int boxWidth;
 
-            private readonly string[] lines; 
+            private string[] lines = Array.Empty<string>();
             private int nextLineIndex;
             private bool linesWrapped;
 
@@ -60,13 +107,24 @@ namespace ParallelCmd.Output
             public BoxedCommandOutput(object lockObject, string command, string? arguments, int boxTop, int boxWidth, int boxHeight, ConsoleColor headerBackground, ConsoleColor headerForeground)
             {
                 this.lockObject = lockObject;
-                this.boxTop = boxTop;
-                this.boxWidth = boxWidth;
-                if (boxHeight > 1)
-                {
-                    lines = new string[boxHeight - 1];
+                this.command = command;
+                this.arguments = arguments;
+                this.headerBackground = headerBackground;
+                this.headerForeground = headerForeground;
 
-                    Console.CursorTop = boxTop;
+                Resize(boxTop, boxWidth, boxHeight);
+            }
+
+
+            public void Resize(int newTop, int newWidth, int newHeight)
+            {
+                boxWidth = newWidth;
+                var hadLines = lines.Length > 0;
+
+                if (newHeight > 1)
+                {
+                    Array.Resize(ref lines, newHeight - 1);
+                    firstLineTop = newTop + 1;
 
                     var currentBackground = Console.BackgroundColor;
                     var currentForeground = Console.ForegroundColor;
@@ -75,7 +133,7 @@ namespace ParallelCmd.Output
                         Console.BackgroundColor = headerBackground;
                         Console.ForegroundColor = headerForeground;
 
-                        WriteFullWidthLine(command + " " + arguments);
+                        WriteFullWidthLine(newTop, command + " " + arguments);
                     }
                     finally
                     {
@@ -84,7 +142,21 @@ namespace ParallelCmd.Output
                     }
                 }
                 else
-                    lines = new string[boxHeight];
+                {
+                    Array.Resize(ref lines, newHeight);
+                    firstLineTop = newTop;
+                }
+
+
+                if (!hadLines)
+                    return;
+
+                var top = firstLineTop;
+                foreach (var line in lines)
+                {
+                    WriteFullWidthLine(top, line);
+                    top++;
+                }
             }
 
 
@@ -101,32 +173,31 @@ namespace ParallelCmd.Output
                         linesWrapped = true;
                     }
 
-                    var top = boxTop + 1;
-
+                    var top = firstLineTop;
 
                     if (linesWrapped)
                     {
                         // lines is a ring buffer, so nextLineIndex is effectively the tail here
                         for (var i = nextLineIndex; i < lines.Length; i++)
                         {
-                            Console.CursorTop = top;
-                            WriteFullWidthLine(lines[i]);
+                            WriteFullWidthLine(top, lines[i]);
                             top++;
                         }
                     }
 
                     for (var i = 0; i < nextLineIndex; i++)
                     {
-                        Console.CursorTop = top;
-                        WriteFullWidthLine(lines[i]);
+                        WriteFullWidthLine(top, lines[i]);
                         top++;
                     }
                 }
             }
 
 
-            private void WriteFullWidthLine(string? line)
+            private void WriteFullWidthLine(int top, string? line)
             {
+                Console.CursorTop = top;
+                Console.CursorLeft = 0;
                 line ??= "";
 
                 // No wrapping support yet
